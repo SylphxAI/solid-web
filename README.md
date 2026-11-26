@@ -20,8 +20,6 @@ The ESM subpaths ship browser and Node SSR builds and TypeScript declarations. K
 
 Requires Node.js 22.12+ and Chromium. Run `npm ci --ignore-scripts`, then `npx playwright install chromium` (or set `CHROMIUM_PATH` to an existing Chromium on a machine with its system dependencies). Run `npm run verify` to build both targets, check the declarations and exercise source and separately installed tarball consumers, including SSR and browser hydration.
 
-## Release status
+## License and releases
 
-The package is not on npm. There is no runnable publish workflow. First publication and trusted-publisher configuration are separate from verification. The first release needs approval for the package license and an npm-supported, authorized bootstrap and publishing route; npm trusted publishing for GitHub Actions does not support self-hosted runners. Do not treat a local build as approval or publication.
-
-Release design (not active): bind `@sylphx/solid-web@0.1.0` to the exact checked commit on protected `main` and the digest of the tarball verified by the installed-consumer tests. A separate release job would publish those same bytes, with `id-token: write` only on that job, no `NODE_AUTH_TOKEN`, and an npm-supported runner. The verification jobs never receive a publishing grant.
+The source and package are [MIT licensed](LICENSE). Verification runs on pull requests and merge groups; neither event can publish. The separate release workflow accepts an explicit dispatch for the exact checked commit on protected `main`. It tests the packed artifact, then verifies its digest before publishing those same bytes with npm OIDC. It requires npm Trusted Publishing to be configured separately.

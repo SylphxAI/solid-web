@@ -19,7 +19,7 @@ export default defineConfig({
   use: { launchOptions: { executablePath: process.env.CHROMIUM_PATH } },
   webServer: [
     {
-      command: 'npm exec -- vite --host 127.0.0.1 --port 4173 --strictPort',
+      command: 'node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 4173 --strictPort',
       url: 'http://127.0.0.1:4173/README.md',
     },
     {

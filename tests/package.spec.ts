@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { build, preview, type PreviewServer } from 'vite';
 import solid from 'vite-plugin-solid';
@@ -16,8 +16,14 @@ for (const solidVersion of ['1.9.0', '1.9.20']) {
     const root = await mkdtemp(join(tmpdir(), 'solid-web-consumer-'));
     let server: PreviewServer | undefined;
     try {
-      const [pack] = JSON.parse(run('npm', ['pack', '--json', '--pack-destination', root], process.cwd()));
-      const digest = createHash('sha256').update(await readFile(join(root, pack.filename))).digest('hex');
+      const candidate = process.env.SOLID_WEB_TARBALL;
+      const [pack] = JSON.parse(run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', root,
+        ...(candidate ? [resolve(candidate)] : [])], process.cwd()));
+      const packed = join(root, pack.filename);
+      if (candidate) expect(await readFile(packed)).toEqual(await readFile(candidate));
+      const digest = createHash('sha256').update(await readFile(packed)).digest('hex');
+      expect(run('tar', ['-xOf', packed, 'package/LICENSE'], root)).toBe(await readFile('LICENSE', 'utf8'));
+      expect(JSON.parse(run('tar', ['-xOf', packed, 'package/package.json'], root)).license).toBe('MIT');
       console.log(`Packed Solid ${solidVersion} test input SHA-256: ${digest}`);
       expect(pack.files.map(({ path }: { path: string }) => path)).toEqual(expect.arrayContaining([
         'dist/browser/meta.js', 'dist/browser/consent.js', 'dist/browser/consent.css',
