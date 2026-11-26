@@ -1,23 +1,30 @@
 import { existsSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
-const suites = ['meta.spec.ts', 'consent.spec.ts', 'package.spec.ts'];
-for (const suite of suites) {
-  if (!existsSync(new URL(`./tests/${suite}`, import.meta.url))) {
-    throw new Error(`Required test suite is missing: ${suite}`);
+const projects = [
+  { name: 'meta', testMatch: 'meta.spec.ts', use: { baseURL: 'http://127.0.0.1:4173' } },
+  { name: 'consent', testMatch: 'consent.spec.ts', use: { baseURL: 'http://127.0.0.1:4174' } },
+  { name: 'package', testMatch: 'package.spec.ts' },
+];
+for (const { testMatch } of projects) {
+  if (!existsSync(new URL(`./tests/${testMatch}`, import.meta.url))) {
+    throw new Error(`Required test suite is missing: ${testMatch}`);
   }
 }
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: suites,
+  projects,
   forbidOnly: true,
-  use: {
-    baseURL: 'http://127.0.0.1:4173',
-    launchOptions: { executablePath: process.env.CHROMIUM_PATH },
-  },
-  webServer: {
-    command: 'npm run fixture',
-    url: 'http://127.0.0.1:4173/tests/consent.fixture.html',
-  },
+  use: { launchOptions: { executablePath: process.env.CHROMIUM_PATH } },
+  webServer: [
+    {
+      command: 'npm exec -- vite --host 127.0.0.1 --port 4173 --strictPort',
+      url: 'http://127.0.0.1:4173/README.md',
+    },
+    {
+      command: 'npm run fixture',
+      url: 'http://127.0.0.1:4174/tests/consent.fixture.html',
+    },
+  ],
 });
