@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact green commit on protected main
+        required: true
+        type: string
+      version:
+        description: Exact version from that commit's package.json
+        required: true
+        type: string
+
+permissions: {}
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: ${{ inputs.source_sha }}
+  RELEASE_VERSION: ${{ inputs.version }}
+
+jobs:
+  prepare:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_id == '1473701321' && github.event.repository.visibility == 'public' && github.ref == 'refs/heads/main' && github.ref_protected && inputs.source_sha != '' && github.sha == inputs.source_sha }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      artifact: ${{ steps.upload.outputs.artifact-id }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24.22.3' # includes npm 11.19.1
+          package-manager-cache: false
+      - name: Verify source and required CI receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          gh api "repos/$GITHUB_REPOSITORY/branches/main" | jq -e --arg sha "$RELEASE_SHA" '.protected == true and .commit.sha == $sha'
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=merge_group&status=success&head_sha=$RELEASE_SHA" |
+            jq -er --arg sha "$RELEASE_SHA" '[.workflow_runs[] | select(.head_sha == $sha and .event == "merge_group" and .conclusion == "success")][0].id // empty')
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/jobs" |
+            jq -e --arg sha "$RELEASE_SHA" 'any(.jobs[]; .head_sha == $sha and .name == "ci-ok" and .conclusion == "success" and any(.steps[]; .name == "Run npm run verify" and .conclusion == "success"))'
+          node --input-type=commonjs -e '
+            const p = require("./package.json");
+            if (p.name !== "@sylphx/solid-web" || p.license !== "MIT" ||
+                p.version !== process.env.RELEASE_VERSION || !/^\d+\.\d+\.\d+$/.test(p.version)) process.exit(1);
+          '
+      - run: npm ci --ignore-scripts
+      - run: node node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium
+      - name: Verify the exact release tarball
+        id: pack
+        run: |
+          dir="$RUNNER_TEMP/release"
+          tarball="$dir/sylphx-solid-web-$RELEASE_VERSION.tgz"
+          mkdir -- "$dir"
+          npm run build
+          npm run types
+          npm pack --ignore-scripts --pack-destination "$dir"
+          digest=$(sha256sum -- "$tarball" | cut -d ' ' -f 1)
+          SOLID_WEB_TARBALL="$tarball" npm test
+          echo "$digest  $tarball" | sha256sum --check --strict
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: verified-npm-tarball-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release/*.tgz
+          if-no-files-found: error
+
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.repository_id == '1473701321' && github.event.repository.visibility == 'public' && github.ref == 'refs/heads/main' && github.ref_protected && inputs.source_sha != '' && github.sha == inputs.source_sha && needs.prepare.result == 'success' && needs.prepare.outputs.artifact != '' && needs.prepare.outputs.sha256 != '' }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24.22.3' # includes npm 11.19.1
+          package-manager-cache: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          artifact-ids: ${{ needs.prepare.outputs.artifact }}
+          path: ${{ runner.temp }}/publish
+      - name: Verify and publish the same bytes with npm OIDC
+        env:
+          EXPECTED_SHA256: ${{ needs.prepare.outputs.sha256 }}
+        run: |
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tarball="$RUNNER_TEMP/publish/sylphx-solid-web-$RELEASE_VERSION.tgz"
+          test -f "$tarball"
+          test ! -L "$tarball"
+          echo "$EXPECTED_SHA256  $tarball" | sha256sum --check --strict
+          status=$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' \
+            "https://registry.npmjs.org/@sylphx%2fsolid-web/$RELEASE_VERSION")
+          test "$status" = 404
+          test "$(git ls-remote --exit-code https://github.com/SylphxAI/solid-web.git refs/heads/main | cut -f 1)" = "$RELEASE_SHA"
+          npm publish "$tarball" --ignore-scripts --access public --provenance --registry=https://registry.npmjs.org
