@@ -1,0 +1,65 @@
+.consent-dock {
+  position: fixed;
+  z-index: var(--consent-dock-z-index, 1);
+  inset-inline: 0;
+  bottom: var(--consent-dock-bottom, 0px);
+  box-sizing: border-box;
+  max-block-size: 50vh;
+  max-block-size: 50dvh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+  padding: .75rem;
+  padding-left: max(.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(.75rem, env(safe-area-inset-right, 0px));
+  padding-bottom: calc(.75rem + max(0px, env(safe-area-inset-bottom, 0px) - var(--consent-dock-bottom, 0px)));
+  border-block-start: 1px solid;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.consent-dock:focus-visible {
+  outline: 2px solid;
+  outline-offset: -3px;
+}
+
+.consent-dock__layout {
+  display: grid;
+  align-items: center;
+  gap: .75rem;
+  max-inline-size: 72rem;
+  margin-inline: auto;
+}
+
+.consent-dock__content:empty {
+  display: none;
+}
+
+.consent-dock__choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem;
+}
+
+.consent-dock__choices > button {
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: .375rem .75rem;
+  font: inherit;
+  overflow-wrap: inherit;
+}
+
+.consent-dock__choices > button:focus-visible {
+  outline: 2px solid;
+  outline-offset: 2px;
+}
+
+@media (min-width: 42rem) {
+  .consent-dock__layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 20rem);
+  }
+
+  .consent-dock__choices {
+    grid-column: 2;
+  }
+}
