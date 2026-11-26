@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "strict": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src", "node_modules/vite/client.d.ts"]
+}
