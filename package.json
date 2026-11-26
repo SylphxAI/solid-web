@@ -1,0 +1,46 @@
+{
+  "name": "@sylphx/solid-web",
+  "version": "0.1.0",
+  "description": "Host-controlled page metadata and consent UI for SolidJS.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "repository": "github:SylphxAI/solid-web",
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    "./meta": {
+      "types": "./dist/meta.d.ts",
+      "browser": "./dist/browser/meta.js",
+      "default": "./dist/server/meta.js"
+    },
+    "./consent": {
+      "types": "./dist/consent.d.ts",
+      "browser": "./dist/browser/consent.js",
+      "default": "./dist/server/consent.js"
+    },
+    "./consent.css": "./dist/browser/consent.css"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "types": "tsc --noEmit",
+    "test": "playwright test",
+    "verify": "npm run build && npm run types && npm test",
+    "fixture": "vite build --mode fixture && vite preview --mode fixture --host 127.0.0.1 --port 4173 --strictPort"
+  },
+  "peerDependencies": {
+    "solid-js": "~1.9.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@solidjs/meta": "0.29.4",
+    "@types/node": "22.20.7",
+    "solid-js": "1.9.20",
+    "typescript": "5.9.3",
+    "vite": "7.3.8",
+    "vite-plugin-solid": "2.11.17"
+  }
+}
